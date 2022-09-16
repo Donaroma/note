@@ -44,6 +44,7 @@ impl GridBlockRevisionPad {
 
     pub fn from_delta(delta: TextDelta) -> CollaborateResult<Self> {
         let s = delta.content()?;
+        tracing::trace!("Block JSON: {}", delta.json_str());
         let revision: GridBlockRevision = serde_json::from_str(&s).map_err(|e| {
             let msg = format!("Deserialize delta to GridBlockRevision failed: {}", e);
             tracing::error!("{}", s);

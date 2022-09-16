@@ -15,7 +15,7 @@ use flowy_net::{
     http_server::folder::FolderHttpCloudService, local_server::LocalServer, ws::connection::FlowyWebSocketConnect,
 };
 use flowy_revision::{RevisionWebSocket, WSStateReceiver};
-use flowy_sync::client_document::default::initial_quill_delta_string;
+use flowy_sync::client_document::default::{initial_quill_delta_string, BuildInGrid};
 use flowy_sync::entities::revision::{RepeatedRevision, Revision};
 use flowy_sync::entities::ws_data::ClientRevisionWSData;
 use flowy_text_block::TextBlockManager;
@@ -142,8 +142,8 @@ impl ViewDataProcessor for TextBlockViewDataProcessor {
         FutureResult::new(async move { manager.init() })
     }
 
-    fn create_container(&self, user_id: &str, view_id: &str, delta_data: Bytes) -> FutureResult<(), FlowyError> {
-        let repeated_revision: RepeatedRevision = Revision::initial_revision(user_id, view_id, delta_data).into();
+    fn create_container(&self, user_id: &str, view_id: &str, view_data: Bytes) -> FutureResult<(), FlowyError> {
+        let repeated_revision: RepeatedRevision = Revision::initial_revision(user_id, view_id, view_data).into();
         let view_id = view_id.to_string();
         let manager = self.0.clone();
         FutureResult::new(async move {
@@ -220,12 +220,14 @@ impl ViewDataProcessor for GridViewDataProcessor {
         FutureResult::new(async { Ok(()) })
     }
 
-    fn create_container(&self, user_id: &str, view_id: &str, delta_data: Bytes) -> FutureResult<(), FlowyError> {
-        let repeated_revision: RepeatedRevision = Revision::initial_revision(user_id, view_id, delta_data).into();
+    fn create_container(&self, user_id: &str, view_id: &str, view_data: Bytes) -> FutureResult<(), FlowyError> {
+        let (grid_delta_bytes, _rows_delta_bytes) = BuildInGrid::from_bytes(view_data).split();
+        let grid_revision: RepeatedRevision = Revision::initial_revision(user_id, view_id, grid_delta_bytes).into();
+        // let rows_revision: RepeatedRevision = Revision::initial_revision(user_id, view_id, rows_delta_bytes).into();
         let view_id = view_id.to_string();
         let grid_manager = self.0.clone();
         FutureResult::new(async move {
-            let _ = grid_manager.create_grid(view_id, repeated_revision).await?;
+            let _ = grid_manager.create_grid(view_id, grid_revision).await?;
             Ok(())
         })
     }

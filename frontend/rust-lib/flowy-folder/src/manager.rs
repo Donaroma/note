@@ -13,10 +13,11 @@ use crate::{
 };
 use bytes::Bytes;
 use flowy_error::FlowyError;
+use flowy_folder_data_model::revision::ViewLayoutTypeRevision;
 use flowy_folder_data_model::user_default;
 use flowy_revision::disk::SQLiteTextBlockRevisionPersistence;
 use flowy_revision::{RevisionManager, RevisionPersistence, RevisionWebSocket, SQLiteRevisionSnapshotPersistence};
-use flowy_sync::client_document::default::{initial_quill_delta_string, initial_read_me};
+use flowy_sync::client_document::default::{initial_board_read_me, initial_quill_delta_string, initial_read_me};
 use flowy_sync::{client_folder::FolderPad, entities::ws_data::ServerRevisionWSData};
 use lazy_static::lazy_static;
 use lib_infra::future::FutureResult;
@@ -215,14 +216,26 @@ impl DefaultFolderBuilder {
         set_current_workspace(&workspace_rev.id);
         for app in workspace_rev.apps.iter() {
             for (index, view) in app.belongings.iter().enumerate() {
-                let view_data = if index == 0 {
-                    initial_read_me().json_str()
-                } else {
-                    initial_quill_delta_string()
+                let view_data = {
+                    match view.layout {
+                        ViewLayoutTypeRevision::Document => {
+                            if index == 0 {
+                                initial_read_me().json_str()
+                            } else {
+                                initial_quill_delta_string()
+                            }
+                        }
+                        ViewLayoutTypeRevision::Grid => {
+                            panic!("Didn't support grid yet")
+                        }
+                        ViewLayoutTypeRevision::Board => initial_board_read_me().json_str(),
+                    }
                 };
+
                 let _ = view_controller.set_latest_view(&view.id);
+                let view_type: ViewDataTypePB = view.data_type.clone().into();
                 let _ = view_controller
-                    .create_view(&view.id, ViewDataTypePB::Text, Bytes::from(view_data))
+                    .create_view(&view.id, view_type, Bytes::from(view_data))
                     .await?;
             }
         }
@@ -249,7 +262,8 @@ impl FolderManager {
 pub trait ViewDataProcessor {
     fn initialize(&self) -> FutureResult<(), FlowyError>;
 
-    fn create_container(&self, user_id: &str, view_id: &str, delta_data: Bytes) -> FutureResult<(), FlowyError>;
+    // view_data is encoded in JSON format.
+    fn create_container(&self, user_id: &str, view_id: &str, view_data: Bytes) -> FutureResult<(), FlowyError>;
 
     fn delete_container(&self, view_id: &str) -> FutureResult<(), FlowyError>;
 

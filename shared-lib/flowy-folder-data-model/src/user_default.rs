@@ -27,7 +27,7 @@ fn create_default_app(workspace_id: String, time: chrono::DateTime<Utc>) -> AppR
     let name = "⭐️ Getting started".to_string();
     let desc = "".to_string();
 
-    let views = vec![create_default_view(app_id.to_string(), time)];
+    let views = create_default_view(app_id.to_string(), time);
 
     AppRevision {
         id: app_id,
@@ -41,14 +41,11 @@ fn create_default_app(workspace_id: String, time: chrono::DateTime<Utc>) -> AppR
     }
 }
 
-fn create_default_view(app_id: String, time: chrono::DateTime<Utc>) -> ViewRevision {
-    let view_id = gen_view_id();
-    let name = "Read me".to_string();
-
-    ViewRevision {
-        id: view_id,
-        app_id,
-        name,
+fn create_default_view(app_id: String, time: chrono::DateTime<Utc>) -> Vec<ViewRevision> {
+    let text_view = ViewRevision {
+        id: gen_view_id(),
+        app_id: app_id.clone(),
+        name: "Read me".to_string(),
         desc: "".to_string(),
         data_type: ViewDataTypeRevision::Text,
         version: 0,
@@ -58,5 +55,21 @@ fn create_default_view(app_id: String, time: chrono::DateTime<Utc>) -> ViewRevis
         ext_data: "".to_string(),
         thumbnail: "".to_string(),
         layout: ViewLayoutTypeRevision::Document,
-    }
+    };
+
+    let board_view = ViewRevision {
+        id: gen_view_id(),
+        app_id,
+        name: "Kanban Board".to_string(),
+        desc: "".to_string(),
+        data_type: ViewDataTypeRevision::Database,
+        version: 0,
+        belongings: vec![],
+        modified_time: time.timestamp(),
+        create_time: time.timestamp(),
+        ext_data: "".to_string(),
+        thumbnail: "".to_string(),
+        layout: ViewLayoutTypeRevision::Board,
+    };
+    vec![text_view, board_view]
 }

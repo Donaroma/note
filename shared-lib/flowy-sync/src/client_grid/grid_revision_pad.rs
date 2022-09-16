@@ -51,6 +51,7 @@ impl GridRevisionPad {
 
     pub fn from_delta(delta: GridRevisionDelta) -> CollaborateResult<Self> {
         let content = delta.content()?;
+        tracing::trace!("Grid JSON: {}", delta.json_str());
         let grid: GridRevision = serde_json::from_str(&content).map_err(|e| {
             let msg = format!("Deserialize delta to grid failed: {}", e);
             tracing::error!("{}", msg);
