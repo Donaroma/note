@@ -1,4 +1,4 @@
-use crate::entities::{GroupChangesetPB, InsertedRowPB, RowPB};
+use crate::entities::{FieldType, GroupChangesetPB, InsertedRowPB, RowPB};
 use crate::services::cell::insert_select_option_cell;
 use crate::services::field::{SelectOptionCellDataPB, SelectOptionPB};
 use crate::services::group::configuration::GroupContext;
@@ -62,7 +62,11 @@ pub fn remove_select_option_row(
     }
 }
 
-pub fn move_group_row(group: &mut Group, context: &mut MoveGroupRowContext) -> Option<GroupChangesetPB> {
+pub fn move_group_row(
+    group: &mut Group,
+    field_type: &FieldType,
+    context: &mut MoveGroupRowContext,
+) -> Option<GroupChangesetPB> {
     let mut changeset = GroupChangesetPB::new(group.id.clone());
     let MoveGroupRowContext {
         row_rev,
@@ -110,6 +114,7 @@ pub fn move_group_row(group: &mut Group, context: &mut MoveGroupRowContext) -> O
         // Update the corresponding row's cell content.
         if from_index.is_none() {
             tracing::debug!("Mark row:{} belong to group:{}", row_rev.id, group.id);
+
             let cell_rev = insert_select_option_cell(group.id.clone(), field_rev);
             row_changeset.cell_by_field_id.insert(field_rev.id.clone(), cell_rev);
             changeset.updated_rows.push(RowPB::from(*row_rev));

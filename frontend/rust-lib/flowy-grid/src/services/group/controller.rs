@@ -1,4 +1,4 @@
-use crate::entities::{GroupChangesetPB, GroupViewChangesetPB, InsertedRowPB, RowPB};
+use crate::entities::{FieldType, GroupChangesetPB, GroupViewChangesetPB, InsertedRowPB, RowPB};
 use crate::services::cell::{decode_any_cell_data, CellBytesParser};
 use crate::services::group::action::GroupAction;
 use crate::services::group::configuration::GroupContext;
@@ -73,6 +73,7 @@ pub trait GroupControllerSharedOperation: Send + Sync {
 /// P: the parser that impl [CellBytesParser] for the CellBytes
 pub struct GenericGroupController<C, T, G, P> {
     pub field_id: String,
+    pub field_type: FieldType,
     pub type_option: Option<T>,
     pub group_ctx: GroupContext<C>,
     group_action_phantom: PhantomData<G>,
@@ -86,13 +87,14 @@ where
     G: GroupGenerator<Context = GroupContext<C>, TypeOptionType = T>,
 {
     pub async fn new(field_rev: &Arc<FieldRevision>, mut configuration: GroupContext<C>) -> FlowyResult<Self> {
-        let field_type_rev = field_rev.ty;
-        let type_option = field_rev.get_type_option::<T>(field_type_rev);
+        let field_type: FieldType = field_rev.ty.into();
+        let type_option = field_rev.get_type_option::<T>(field_rev.ty);
         let groups = G::generate_groups(&field_rev.id, &configuration, &type_option);
         let _ = configuration.init_groups(groups, true)?;
 
         Ok(Self {
             field_id: field_rev.id.clone(),
+            field_type,
             type_option,
             group_ctx: configuration,
             group_action_phantom: PhantomData,
@@ -278,12 +280,19 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip_all, err)]
     fn move_group_row(&mut self, context: MoveGroupRowContext) -> FlowyResult<Vec<GroupChangesetPB>> {
-        if let Some(cell_rev) = context.row_rev.cells.get(&self.field_id) {
-            let cell_bytes = decode_any_cell_data(cell_rev.data.clone(), context.field_rev);
+        let cell_rev = match context.row_rev.cells.get(&self.field_id) {
+            Some(cell_rev) => Some(cell_rev.clone()),
+            None => self.default_cell_rev(),
+        };
+
+        if let Some(cell_rev) = cell_rev {
+            let cell_bytes = decode_any_cell_data(cell_rev.data, context.field_rev);
             let cell_data = cell_bytes.parser::<P>()?;
             Ok(self.move_row(&cell_data, context))
         } else {
+            tracing::warn!("Unexpected moving group row, changesets should not be empty");
             Ok(vec![])
         }
     }
